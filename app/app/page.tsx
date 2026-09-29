@@ -1,46 +1,35 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { Alert } from "@/design-system/components/alert";
-import { buttonVariants } from "@/design-system/components/button";
 import { Card } from "@/design-system/components/card";
 import { MetricCard } from "@/design-system/components/metric-card";
-import { Meter } from "@/design-system/components/meter";
 import { StatusBadge } from "@/design-system/components/status-badge";
-import { Stepper } from "@/design-system/components/stepper";
-import { cn } from "@/design-system/utils";
-import { DEMO_TASKS, getDemoSummary, runDemo } from "@/lib/mesa/demo";
+import { DEMO_TASKS, DEFAULT_BUDGET, getDemoSummary, runDemo } from "@/lib/mesa/demo";
+import type { BudgetConfig } from "@/lib/mesa/types";
 
-const PHASES = ["Planner", "Researcher", "Writer", "Reviewer"];
+type Summary = ReturnType<typeof getDemoSummary>;
 
 export default function AppPage() {
   const [taskId, setTaskId] = useState(DEMO_TASKS[0].id);
-
-  const summary = useMemo(() => {
-    const task = DEMO_TASKS.find((t) => t.id === taskId) ?? DEMO_TASKS[0];
-    return getDemoSummary(runDemo(task.task));
-  }, [taskId]);
-
-  const revisionCount = summary.steps.filter(
-    (s) => s.agent === "writer" && s.input.startsWith("revise"),
-  ).length;
+  const [customTask, setCustomTask] = useState("");
+  const [maxSteps, setMaxSteps] = useState(DEFAULT_BUDGET.maxSteps);
+  const [maxSubqueries, setMaxSubqueries] = useState(DEFAULT_BUDGET.maxSubqueries);
+  const [summary, setSummary] = useState<Summary>(() =>
+    getDemoSummary(runDemo(DEMO_TASKS[0].task)),
+  );
 
   const approved = summary.verdict === "approve";
-  const budget = summary.budget as {
-    subqueriesUsed: number;
-    subqueriesMax: number;
-    tokensUsed: number;
-    tokensMax: number;
-    stepsUsed: number;
-    stepsMax: number;
-    wallClockMs: number;
-    wallClockMax: number;
-    exhausted: boolean;
-    exhaustedReason: string | null;
-  };
+  const customMode = taskId === "custom";
+  const effectiveTask = customMode
+    ? customTask.trim()
+    : (DEMO_TASKS.find((t) => t.id === taskId)?.task ?? DEMO_TASKS[0].task);
 
-  const agentOrder = ["planner", "researcher", "writer", "reviewer"];
+  function run() {
+    if (!effectiveTask) return;
+    const budget: BudgetConfig = { ...DEFAULT_BUDGET, maxSteps, maxSubqueries };
+    setSummary(getDemoSummary(runDemo(effectiveTask, budget)));
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -78,156 +67,159 @@ export default function AppPage() {
       </header>
 
       <div className="max-w-5xl mx-auto px-6 py-8 space-y-10">
-        {/* ── TASK SELECTOR ───────────────────── */}
-        <section className="flex flex-wrap items-center gap-2">
-          {DEMO_TASKS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTaskId(t.id)}
-              className={cn(
-                buttonVariants({ variant: t.id === taskId ? "default" : "outline", size: "sm" }),
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
-        </section>
-
         {/* ── SUMMARY BAR ─────────────────────── */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <MetricCard label="Agentes" value={4} hint="supervisor + 3 especialistas" />
-          <MetricCard label="Pasos" value={summary.steps.length} />
+          <MetricCard label="Pasos" value={summary.trace.stepCount} />
           <MetricCard label="Tokens" value={summary.trace.totalTokens} />
           <MetricCard
             label="Veredicto"
             value={approved ? "Aprobado" : "Rechazado"}
             tone={approved ? "success" : "danger"}
-            hint={revisionCount > 0 ? `${revisionCount} revisión(es)` : "sin revisiones"}
           />
         </div>
 
-        {/* ── GRAPH + PHASE FLOW ──────────────── */}
+        {/* ── PLAYGROUND ──────────────────────── */}
         <section>
-          <h2 className="text-lg font-semibold tracking-tight text-foreground mb-1">Grafo de handoffs tipados</h2>
+          <h2 className="text-lg font-semibold tracking-tight text-foreground mb-1">Orquestación en vivo</h2>
           <p className="text-sm text-muted-foreground mb-5">
-            supervisor → planner → researcher → writer ⇄ reviewer. Cada handoff valida un
-            schema estructural (queries, findings, draft, feedback), no una &quot;persona&quot;.
+            Elige una tarea de la demo o escribe la tuya, ajusta el presupuesto y ejecuta el grafo
+            supervisor → planner → researcher → writer ⇄ reviewer.
           </p>
-          <Stepper steps={PHASES} current={PHASES.length} />
-          <div className="mt-5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            {agentOrder.map((agent, i) => (
-              <span key={agent} className="flex items-center gap-2">
-                <span className="font-mono text-foreground">{agent}</span>
-                {i < agentOrder.length - 1 && (
-                  <span className="text-muted-foreground">
-                    {agent === "writer" && i === 2 ? "⇄" : "→"}
-                  </span>
-                )}
-              </span>
-            ))}
-          </div>
-        </section>
 
-        {/* ── BUDGET ENFORCEMENT ──────────────── */}
-        <section>
-          <h2 className="text-lg font-semibold tracking-tight text-foreground mb-1">Presupuesto (enforced en código)</h2>
-          <p className="text-sm text-muted-foreground mb-5">
-            Sub-queries, tokens, pasos y wall-clock se chequean en cada paso. Si un límite
-            se cruza, el grafo se detiene determinísticamente — no se le pide al prompt.
-          </p>
-          <div className="grid gap-5 sm:grid-cols-2">
-            <Card className="p-5 space-y-4">
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Sub-queries</span>
-                  <span className="tabular-nums">{budget.subqueriesUsed}/{budget.subqueriesMax}</span>
-                </div>
-                <Meter value={budget.subqueriesUsed} max={budget.subqueriesMax} tone={budget.subqueriesUsed >= budget.subqueriesMax ? "danger" : "info"} />
-              </div>
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Tokens</span>
-                  <span className="tabular-nums">{budget.tokensUsed}/{budget.tokensMax}</span>
-                </div>
-                <Meter value={budget.tokensUsed} max={budget.tokensMax} tone={budget.tokensUsed >= budget.tokensMax ? "danger" : "info"} />
-              </div>
-            </Card>
-            <Card className="p-5 space-y-4">
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Pasos</span>
-                  <span className="tabular-nums">{budget.stepsUsed}/{budget.stepsMax}</span>
-                </div>
-                <Meter value={budget.stepsUsed} max={budget.stepsMax} tone={budget.stepsUsed >= budget.stepsMax ? "danger" : "info"} />
-              </div>
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Wall-clock</span>
-                  <span className="tabular-nums">{budget.wallClockMs}ms / {budget.wallClockMax}ms</span>
-                </div>
-                <Meter value={budget.wallClockMs} max={budget.wallClockMax} tone={budget.wallClockMs >= budget.wallClockMax ? "danger" : "info"} />
-              </div>
-            </Card>
-          </div>
-          {budget.exhausted && (
-            <Alert tone="warning" title="Presupuesto agotado" className="mt-4">
-              El grafo terminó porque se cruzó el límite de <strong>{budget.exhaustedReason}</strong>. Sin
-              excepciones sin manejar, sin bucles infinitos.
-            </Alert>
-          )}
-        </section>
-
-        {/* ── REVIEWER SUBGRAPH ──────────────── */}
-        <section>
-          <h2 className="text-lg font-semibold tracking-tight text-foreground mb-1">Revisor que termina</h2>
-          <p className="text-sm text-muted-foreground mb-5">
-            El revisor puede devolver el trabajo exactamente una vez. El contador de rechazos
-            es estrictamente creciente y acotado, así que el grafo siempre converge.
-          </p>
-          <div className="flex items-center gap-3">
-            <StatusBadge tone={approved ? "success" : "danger"}>
-              {approved ? "APPROVE" : "REJECT"}
-            </StatusBadge>
-            <span className="text-sm text-muted-foreground">
-              {revisionCount > 0
-                ? `El primer borrador fue devuelto (reject_and_revise) y se revisó ${revisionCount} vez/veces antes del veredicto final.`
-                : "El borrador fue aprobado en la primera pasada."}
-            </span>
-          </div>
-        </section>
-
-        {/* ── STEP TRACE ──────────────────────── */}
-        <section>
-          <h2 className="text-lg font-semibold tracking-tight text-foreground mb-1">Trace paso a paso</h2>
-          <p className="text-sm text-muted-foreground mb-5">
-            Qué agente, qué recibió, qué produjo, cuántos tokens y cuánta latencia. El trace es
-            duradero: puedes resumir la run desde un snapshot.
-          </p>
-          <div className="overflow-x-auto rounded-[var(--radius-md)] shadow-[var(--shadow-card)] bg-card">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--gray-50)]">
-                  <th scope="col" className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Agente</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Input</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Output</th>
-                  <th scope="col" className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tokens</th>
-                  <th scope="col" className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Latencia</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border)]">
-                {summary.steps.map((step, i) => (
-                  <tr key={i}>
-                    <td className="px-5 py-3 font-mono text-xs text-foreground">{step.agent}</td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground max-w-[220px] truncate">{step.input}</td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground max-w-[220px] truncate">{step.output}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-foreground">{step.tokens}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-foreground">{step.latencyMs}ms</td>
-                  </tr>
+          <Card className="p-5 space-y-4">
+            <div className="space-y-1">
+              <span className="text-sm text-foreground">Tarea</span>
+              <select
+                value={taskId}
+                onChange={(e) => setTaskId(e.target.value)}
+                className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/60"
+              >
+                {DEMO_TASKS.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
                 ))}
-              </tbody>
-            </table>
-          </div>
+                <option value="custom">Tarea personalizada…</option>
+              </select>
+            </div>
+
+            {customMode && (
+              <div className="space-y-1">
+                <span className="text-sm text-foreground">Describe tu tarea</span>
+                <textarea
+                  value={customTask}
+                  onChange={(e) => setCustomTask(e.target.value)}
+                  placeholder="Ej. Investigar cómo funciona el fraude con tarjetas y qué controles lo mitigan."
+                  rows={3}
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/60"
+                />
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-foreground">Pasos máximos</span>
+                <span className="font-mono text-sm tabular-nums text-foreground">{maxSteps}</span>
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={20}
+                step={1}
+                value={maxSteps}
+                onChange={(e) => setMaxSteps(Number(e.target.value))}
+                className="w-full accent-foreground"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-foreground">Sub-queries máximas</span>
+                <span className="font-mono text-sm tabular-nums text-foreground">{maxSubqueries}</span>
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={12}
+                step={1}
+                value={maxSubqueries}
+                onChange={(e) => setMaxSubqueries(Number(e.target.value))}
+                className="w-full accent-foreground"
+              />
+            </div>
+
+            <button
+              onClick={run}
+              disabled={customMode && !customTask.trim()}
+              className="w-full rounded-[var(--radius-md)] bg-accent px-4 py-2.5 text-sm font-medium text-[#ffffff] hover:bg-accent/90 transition-colors disabled:opacity-50"
+            >
+              Ejecutar orquestación
+            </button>
+          </Card>
+
+          <Card className="mt-4 p-5 space-y-5">
+            <div className="flex flex-wrap items-center gap-3">
+              <StatusBadge tone={approved ? "success" : "danger"} dot>
+                {approved ? "APPROVE" : "REJECT"}
+              </StatusBadge>
+              <span className="text-sm text-muted-foreground truncate">{summary.task}</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Secciones</p>
+                <p className="font-semibold text-foreground">{summary.sections}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Findings</p>
+                <p className="font-semibold text-foreground">{summary.findingsCount}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Pasos</p>
+                <p className="font-semibold text-foreground">{summary.trace.stepCount}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Tokens</p>
+                <p className="font-semibold text-foreground">{summary.budget.tokensUsed}</p>
+              </div>
+            </div>
+
+            {summary.budget.exhausted && (
+              <div className="rounded-[var(--radius-md)] border border-warning/25 bg-warning/10 p-3 text-sm text-foreground">
+                Presupuesto agotado: se cruzó el límite de <strong>{summary.budget.exhaustedReason}</strong>.
+              </div>
+            )}
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Plan</p>
+              <ul className="space-y-1.5">
+                {summary.plan.map((section) => (
+                  <li key={section.id} className="text-sm text-foreground">
+                    <span className="text-muted-foreground">•</span> {section.title}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Findings</p>
+              <ul className="space-y-1.5">
+                {summary.findings.map((finding, i) => (
+                  <li key={i} className="text-sm text-foreground">
+                    <span className="text-muted-foreground">•</span> {finding}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Borrador</p>
+              <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-background p-4 text-sm text-foreground whitespace-pre-wrap">
+                {summary.draft}
+              </div>
+            </div>
+          </Card>
         </section>
 
         <footer className="pt-8 border-t border-[var(--border)] flex items-center justify-between text-xs text-muted-foreground">
