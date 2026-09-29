@@ -1,0 +1,28 @@
+{
+  "topics": {
+    "credit": [
+      "Los burós de crédito consolidan historiales de pago para calcular un score de riesgo.",
+      "Un score de crédito alto correlaciona con menor probabilidad de default a 12 meses.",
+      "Las líneas de crédito revolving reportan utilización como señal de riesgo.",
+      "El sobreendeudamiento se detecta cuando la carga de deuda supera el ingreso disponible."
+    ],
+    "identity": [
+      "La verificación de identidad cruza documento oficial contra biometría facial.",
+      "El robo de identidad sintética mezcla datos reales y ficticios para crear perfiles falsos.",
+      "Un KYC sólido reduce la tasa de fraude en originación de cuentas.",
+      "Los documentos apócrifos suelen fallar en microtexturas y hologramas."
+    ],
+    "risk": [
+      "Un modelo de riesgo asigna una probabilidad de default a cada solicitud.",
+      "Las señales alternativas (telco, utilidades) ayudan a scorear a no bancarizados.",
+      "La calibración mide si la probabilidad predicha coincide con la tasa observada.",
+      "Un cutoff de aprobación traduce el riesgo en una decisión binaria de crédito."
+    ]
+  },
+  "sectionTemplates": {
+    "contexto": "Contexto y alcance del problema",
+    "evidencia": "Evidencia cuantitativa y fuentes",
+    "riesgos": "Riesgos y limitaciones del enfoque",
+    "recomendacion": "Recomendación y próximos pasos"
+  }
+}

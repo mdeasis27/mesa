@@ -1,0 +1,21 @@
+{
+  "subgraphStepCount": [
+    { "maxRejections": 0, "steps": 4 },
+    { "maxRejections": 1, "steps": 6 },
+    { "maxRejections": 2, "steps": 8 },
+    { "maxRejections": 5, "steps": 14 }
+  ],
+  "budgetExhaustion": [
+    { "subqueriesUsed": 0, "tokensUsed": 101, "stepsUsed": 0, "maxSubqueries": 3, "maxTokens": 100, "maxSteps": 5, "exhausted": true, "reasonKey": "tokens" },
+    { "subqueriesUsed": 0, "tokensUsed": 99, "stepsUsed": 0, "maxSubqueries": 3, "maxTokens": 100, "maxSteps": 5, "exhausted": false, "reasonKey": null },
+    { "subqueriesUsed": 3, "tokensUsed": 0, "stepsUsed": 0, "maxSubqueries": 3, "maxTokens": 100, "maxSteps": 5, "exhausted": true, "reasonKey": "subqueries" },
+    { "subqueriesUsed": 0, "tokensUsed": 0, "stepsUsed": 5, "maxSubqueries": 3, "maxTokens": 100, "maxSteps": 5, "exhausted": true, "reasonKey": "steps" }
+  ],
+  "reviewerDecisions": [
+    { "verdict": "approve", "rejectCount": 0, "maxRejections": 1, "action": "approve" },
+    { "verdict": "reject", "rejectCount": 0, "maxRejections": 1, "action": "reject" },
+    { "verdict": "reject_and_revise", "rejectCount": 0, "maxRejections": 1, "action": "revise", "rejectCountAfter": 1 },
+    { "verdict": "reject_and_revise", "rejectCount": 1, "maxRejections": 1, "action": "reject" },
+    { "verdict": "reject_and_revise", "rejectCount": 1, "maxRejections": 2, "action": "revise", "rejectCountAfter": 2 }
+  ]
+}
