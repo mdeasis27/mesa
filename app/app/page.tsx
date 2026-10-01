@@ -1,35 +1,94 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card } from "@/design-system/components/card";
 import { MetricCard } from "@/design-system/components/metric-card";
 import { StatusBadge } from "@/design-system/components/status-badge";
-import { DEMO_TASKS, DEFAULT_BUDGET, getDemoSummary, runDemo } from "@/lib/mesa/demo";
-import type { BudgetConfig } from "@/lib/mesa/types";
+import { DEMO_TASKS, DEFAULT_BUDGET } from "@/lib/mesa/demo";
 
-type Summary = ReturnType<typeof getDemoSummary>;
+interface RunSummary {
+  runId: string;
+  task: string;
+  verdict: "approve" | "reject";
+  sections: number;
+  findingsCount: number;
+  draftChars: number;
+  trace: { stepCount: number; totalTokens: number; totalLatencyMs: number };
+  budget: {
+    tokensUsed: number;
+    stepsUsed: number;
+    exhausted: boolean;
+    exhaustedReason: string | null;
+  };
+  plan: { id: string; title: string }[];
+  findings: string[];
+  draft: string;
+}
+
+interface RunHistoryItem {
+  id: number;
+  task: string;
+  verdict: string;
+  sections: number;
+  findings: number;
+  steps: number;
+  tokens: number;
+  created_at: string;
+}
 
 export default function AppPage() {
   const [taskId, setTaskId] = useState(DEMO_TASKS[0].id);
-  const [customTask, setCustomTask] = useState("");
   const [maxSteps, setMaxSteps] = useState(DEFAULT_BUDGET.maxSteps);
   const [maxSubqueries, setMaxSubqueries] = useState(DEFAULT_BUDGET.maxSubqueries);
-  const [summary, setSummary] = useState<Summary>(() =>
-    getDemoSummary(runDemo(DEMO_TASKS[0].task)),
-  );
+  const [summary, setSummary] = useState<RunSummary | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<RunHistoryItem[]>([]);
 
-  const approved = summary.verdict === "approve";
-  const customMode = taskId === "custom";
-  const effectiveTask = customMode
-    ? customTask.trim()
-    : (DEMO_TASKS.find((t) => t.id === taskId)?.task ?? DEMO_TASKS[0].task);
+  const task = DEMO_TASKS.find((t) => t.id === taskId)?.task ?? DEMO_TASKS[0].task;
 
-  function run() {
-    if (!effectiveTask) return;
-    const budget: BudgetConfig = { ...DEFAULT_BUDGET, maxSteps, maxSubqueries };
-    setSummary(getDemoSummary(runDemo(effectiveTask, budget)));
+  async function run() {
+    setLoading(true);
+    setError(null);
+    setSummary(null);
+    try {
+      const res = await fetch("/api/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task, maxSteps, maxSubqueries }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Error ejecutando la orquestación");
+      } else {
+        setSummary(data);
+        loadHistory();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error de red");
+    } finally {
+      setLoading(false);
+    }
   }
+
+  async function loadHistory() {
+    try {
+      const res = await fetch("/api/history");
+      if (res.ok) {
+        const data = await res.json();
+        setHistory(data.runs ?? []);
+      }
+    } catch {
+      /* history is best-effort */
+    }
+  }
+
+  useEffect(() => {
+    loadHistory();
+  }, []);
+
+  const approved = summary?.verdict === "approve";
 
   return (
     <div className="min-h-screen bg-background">
@@ -59,9 +118,7 @@ export default function AppPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <StatusBadge tone="info" dot className="px-3 py-1">
-              Demo mode
-            </StatusBadge>
+            <StatusBadge tone="success" dot className="px-3 py-1">Postgres en vivo</StatusBadge>
           </div>
         </div>
       </header>
@@ -70,12 +127,12 @@ export default function AppPage() {
         {/* ── SUMMARY BAR ─────────────────────── */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <MetricCard label="Agentes" value={4} hint="supervisor + 3 especialistas" />
-          <MetricCard label="Pasos" value={summary.trace.stepCount} />
-          <MetricCard label="Tokens" value={summary.trace.totalTokens} />
+          <MetricCard label="Pasos" value={summary ? summary.trace.stepCount : "—"} />
+          <MetricCard label="Tokens" value={summary ? summary.trace.totalTokens : "—"} />
           <MetricCard
             label="Veredicto"
-            value={approved ? "Aprobado" : "Rechazado"}
-            tone={approved ? "success" : "danger"}
+            value={summary ? (approved ? "Aprobado" : "Rechazado") : "—"}
+            tone={summary ? (approved ? "success" : "danger") : "neutral"}
           />
         </div>
 
@@ -83,8 +140,9 @@ export default function AppPage() {
         <section>
           <h2 className="text-lg font-semibold tracking-tight text-foreground mb-1">Orquestación en vivo</h2>
           <p className="text-sm text-muted-foreground mb-5">
-            Elige una tarea de la demo o escribe la tuya, ajusta el presupuesto y ejecuta el grafo
-            supervisor → planner → researcher → writer ⇄ reviewer.
+            Elige una tarea de la demo, ajusta el presupuesto y ejecuta el grafo
+            supervisor → planner → researcher → writer ⇄ reviewer en el backend. Cada
+            corrida queda persistida en Postgres.
           </p>
 
           <Card className="p-5 space-y-4">
@@ -100,22 +158,8 @@ export default function AppPage() {
                     {t.label}
                   </option>
                 ))}
-                <option value="custom">Tarea personalizada…</option>
               </select>
             </div>
-
-            {customMode && (
-              <div className="space-y-1">
-                <span className="text-sm text-foreground">Describe tu tarea</span>
-                <textarea
-                  value={customTask}
-                  onChange={(e) => setCustomTask(e.target.value)}
-                  placeholder="Ej. Investigar cómo funciona el fraude con tarjetas y qué controles lo mitigan."
-                  rows={3}
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/60"
-                />
-              </div>
-            )}
 
             <div className="space-y-1">
               <div className="flex items-center justify-between">
@@ -151,79 +195,124 @@ export default function AppPage() {
 
             <button
               onClick={run}
-              disabled={customMode && !customTask.trim()}
+              disabled={loading}
               className="w-full rounded-[var(--radius-md)] bg-accent px-4 py-2.5 text-sm font-medium text-[#ffffff] hover:bg-accent/90 transition-colors disabled:opacity-50"
             >
-              Ejecutar orquestación
+              {loading ? "Ejecutando…" : "Ejecutar orquestación"}
             </button>
           </Card>
 
-          <Card className="mt-4 p-5 space-y-5">
-            <div className="flex flex-wrap items-center gap-3">
-              <StatusBadge tone={approved ? "success" : "danger"} dot>
-                {approved ? "APPROVE" : "REJECT"}
-              </StatusBadge>
-              <span className="text-sm text-muted-foreground truncate">{summary.task}</span>
+          {error && (
+            <div className="mt-4 rounded-[var(--radius-md)] border border-danger/25 bg-danger/10 p-4 text-sm text-foreground">
+              {error}
             </div>
+          )}
 
-            <div className="grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
+          {summary && (
+            <Card className="mt-4 p-5 space-y-5">
+              <div className="flex flex-wrap items-center gap-3">
+                <StatusBadge tone={approved ? "success" : "danger"} dot>
+                  {approved ? "APPROVE" : "REJECT"}
+                </StatusBadge>
+                <span className="text-sm text-muted-foreground truncate">{summary.task}</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Secciones</p>
+                  <p className="font-semibold text-foreground">{summary.sections}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Findings</p>
+                  <p className="font-semibold text-foreground">{summary.findingsCount}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Pasos</p>
+                  <p className="font-semibold text-foreground">{summary.trace.stepCount}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Tokens</p>
+                  <p className="font-semibold text-foreground">{summary.budget.tokensUsed}</p>
+                </div>
+              </div>
+
+              {summary.budget.exhausted && (
+                <div className="rounded-[var(--radius-md)] border border-warning/25 bg-warning/10 p-3 text-sm text-foreground">
+                  Presupuesto agotado: se cruzó el límite de <strong>{summary.budget.exhaustedReason}</strong>.
+                </div>
+              )}
+
               <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Secciones</p>
-                <p className="font-semibold text-foreground">{summary.sections}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Plan</p>
+                <ul className="space-y-1.5">
+                  {summary.plan.map((section) => (
+                    <li key={section.id} className="text-sm text-foreground">
+                      <span className="text-muted-foreground">•</span> {section.title}
+                    </li>
+                  ))}
+                </ul>
               </div>
+
               <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Findings</p>
-                <p className="font-semibold text-foreground">{summary.findingsCount}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Findings</p>
+                <ul className="space-y-1.5">
+                  {summary.findings.map((finding, i) => (
+                    <li key={i} className="text-sm text-foreground">
+                      <span className="text-muted-foreground">•</span> {finding}
+                    </li>
+                  ))}
+                </ul>
               </div>
+
               <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Pasos</p>
-                <p className="font-semibold text-foreground">{summary.trace.stepCount}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Borrador</p>
+                <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-background p-4 text-sm text-foreground whitespace-pre-wrap">
+                  {summary.draft}
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Tokens</p>
-                <p className="font-semibold text-foreground">{summary.budget.tokensUsed}</p>
-              </div>
-            </div>
-
-            {summary.budget.exhausted && (
-              <div className="rounded-[var(--radius-md)] border border-warning/25 bg-warning/10 p-3 text-sm text-foreground">
-                Presupuesto agotado: se cruzó el límite de <strong>{summary.budget.exhaustedReason}</strong>.
-              </div>
-            )}
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Plan</p>
-              <ul className="space-y-1.5">
-                {summary.plan.map((section) => (
-                  <li key={section.id} className="text-sm text-foreground">
-                    <span className="text-muted-foreground">•</span> {section.title}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Findings</p>
-              <ul className="space-y-1.5">
-                {summary.findings.map((finding, i) => (
-                  <li key={i} className="text-sm text-foreground">
-                    <span className="text-muted-foreground">•</span> {finding}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Borrador</p>
-              <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-background p-4 text-sm text-foreground whitespace-pre-wrap">
-                {summary.draft}
-              </div>
-            </div>
-          </Card>
+            </Card>
+          )}
         </section>
 
+        {/* ── HISTORY ─────────────────────────── */}
+        {history.length > 0 && (
+          <section>
+            <h3 className="text-sm font-semibold text-foreground mb-3">Historial de corridas (persistido en Postgres)</h3>
+            <div className="overflow-x-auto rounded-[var(--radius-md)] shadow-[var(--shadow-card)] bg-card">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--border)] bg-[var(--gray-50)]">
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tarea</th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Veredicto</th>
+                    <th scope="col" className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Secciones</th>
+                    <th scope="col" className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Findings</th>
+                    <th scope="col" className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Pasos</th>
+                    <th scope="col" className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tokens</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border)]">
+                  {history.map((h) => (
+                    <tr key={h.id}>
+                      <td className="px-4 py-2.5 text-foreground max-w-xs truncate">{h.task}</td>
+                      <td className="px-4 py-2.5">
+                        <StatusBadge tone={h.verdict === "approve" ? "success" : "danger"}>
+                          {h.verdict}
+                        </StatusBadge>
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-foreground">{h.sections}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-foreground">{h.findings}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-foreground">{h.steps}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-foreground">{h.tokens}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
         <footer className="pt-8 border-t border-[var(--border)] flex items-center justify-between text-xs text-muted-foreground">
-          <span>Mesa · Multi-agent orchestration · Demo mode</span>
+          <span>Mesa · Multi-agent orchestration · Backend + Postgres</span>
           <a href="https://github.com/mdeasis27/mesa" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors font-mono">GitHub</a>
         </footer>
       </div>
