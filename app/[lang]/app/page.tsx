@@ -1,40 +1,89 @@
 "use client";
 import { useState } from "react";
 import { useLocale } from "@/design-system/i18n/context";
-import { useDemoRun } from "@/design-system/demo/use-demo-run";
 import { TracePlayer } from "@/design-system/demo/trace-player";
-import { MissionBrief, MissionPrompt, MissionComparison, DecisionNotes } from "@/design-system/demo/mission-lab";
-import { ScenarioPicker } from "@/design-system/demo/decision-lab";
+import { MissionPrompt, MissionComparison } from "@/design-system/demo/mission-lab";
+import { useDemoRun } from "@/design-system/demo/use-demo-run";
+import { StoryHero, StorySection, AnalogyBlock, WhyIBuiltIt, FitGuide, ProvesBlock, EngineerNotes } from "@/design-system/demo/project-story";
 import { traceCopy } from "@/lib/experience/trace-copy";
 import { runMission } from "@/lib/experience/mission";
-import story from "@/docs/quality/business-story.json";
-import type { ExperienceInput, ExperienceResult } from "@/lib/experience/adapter";
-import { MesaScene } from "@/lib/experience/mesa-scene";
-const defaultInput = (es: boolean): ExperienceInput => ({task:es?"Evaluar controles de riesgo de identidad":"Assess identity risk controls",maxSteps:12,maxTokens:10000,maxRejections:1});
+import { MesaStoryScene } from "@/lib/experience/story-scene";
+import { COMPLETE_FRAME, delivered, relayState } from "@/lib/experience/relay-state";
+import type { RunState } from "@/lib/mesa/types";
+import { STORY } from "@/lib/experience/story";
+
+const REPO = "https://github.com/mdeasis27/mesa";
+const DEFAULT_STEPS = 3;
+// ponytail: tokens fixed at 10,000 so the bet text names every control the answer depends on.
+const MAX_TOKENS = 10000;
+const finished = (r: RunState) => Object.values(relayState(r, Infinity)).filter(t => t === "success").length;
+
 export default function Page() {
-  const locale=useLocale(); const es=locale==="es"; const s=story[locale];
-  const defaults=defaultInput(es);
-  const [input,setInput]=useState(defaults); const [scenario,setScenario]=useState("a"); const [prediction,setPrediction]=useState<string|null>(null);
-  const demo=useDemoRun(runMission); const run=demo.run;
-  const change=(next:ExperienceInput,id="")=>{setInput(next);setScenario(id);setPrediction(null);demo.reset();};
-  const choose=(id:string)=>change({...defaults,maxSteps:id==="a"?12:1,maxTokens:id==="a"?10000:100},id);
-  const challenge=()=>change({...defaults,maxSteps:1});
-  const outcome=(r:ExperienceResult)=>r.budget.exhausted?"stops":r.reviewerPassed&&r.draft?"completes":"review";
-  const label=(r:ExperienceResult)=>outcome(r)==="completes"?(es?"Informe aprobado":"Report approved"):outcome(r)==="stops"?(es?"Límite alcanzado":"Budget stops work"):(es?"Requiere revisión":"Needs review");
-  const detail=(r:ExperienceResult)=>`${r.budget.stepsUsed} ${es?"pasos":"steps"} · ${r.budget.tokensUsed} ${es?"unidades de tokens simuladas":"modeled token units"} · ${r.draft?(es?"borrador disponible":"draft available"):(es?"sin borrador final":"no final draft")}`;
-  return <main className="min-h-screen bg-background px-5 py-12 text-foreground sm:px-6"><div className="mx-auto max-w-5xl">
-    <MissionBrief locale={locale} name="Mesa" title={es?"¿Cuánto trabajo autorizas al agente?":"How much work do you authorize the agent to do?"} context={s.problem} role={s.user} stakes={s.value}/>
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]"><section className="min-w-0 rounded-xl border border-border p-5">
-      <button data-mission-challenge className="mb-5 min-h-11 rounded border border-accent px-4 text-sm" onClick={challenge}>{es?"Reto: solo un paso":"Challenge: only one step"}</button>
-      <ScenarioPicker locale={locale} selected={scenario} onSelect={choose} options={[{id:"a",label:s.scenarioA.title,description:s.scenarioA.input},{id:"b",label:s.scenarioB.title,description:s.scenarioB.input}]}/>
-      <label className="block text-sm">{es?"Tarea":"Task"}<textarea className="mt-2 min-h-28 w-full rounded border bg-background p-3" value={input.task} onChange={e=>change({...input,task:e.target.value})}/></label>
-      <label className="mt-4 block text-sm">{es?"Pasos autorizados":"Authorized steps"}: {input.maxSteps}<input className="mt-2 w-full" type="range" min="1" max="12" value={input.maxSteps} onChange={e=>change({...input,maxSteps:Number(e.target.value)})}/></label>
-      <label className="mt-4 block text-sm">{es?"Unidades de tokens simuladas":"Modeled token units"}: {input.maxTokens}<input className="mt-2 w-full" type="range" min="100" max="10000" step="100" value={input.maxTokens} onChange={e=>change({...input,maxTokens:Number(e.target.value)})}/></label>
-      <p className="mt-3 text-xs leading-5 text-muted-foreground">{es?"Una revisión permitida. La referencia mantiene tarea y tokens; solo autoriza 12 pasos. El reto de un paso mantiene 10 000 unidades para aislar ese límite.":"One revision allowance. The reference keeps task and tokens fixed; it authorizes 12 steps. The one-step challenge keeps 10,000 units to isolate that limit."}</p>
-      <MissionPrompt locale={locale} question={es?"¿El flujo entregará un informe aprobado?":"Will the workflow deliver an approved report?"} options={[{id:"completes",label:es?"Informe aprobado":"Approved report"},{id:"stops",label:es?"Se detiene por límite":"Budget stops it"},{id:"review",label:es?"Requiere revisión":"Needs review"}]} prediction={prediction} onPredict={setPrediction} locked={demo.running||!!run}/>
-      <div className="flex flex-wrap gap-2"><button data-run-experiment disabled={demo.running} className="min-h-11 flex-1 rounded bg-accent px-4 text-white disabled:opacity-50" onClick={()=>demo.execute(input)}>{es?"Ejecutar":"Run"}</button><button className="rounded border px-3" onClick={demo.cancel}>{es?"Cancelar":"Cancel"}</button><button className="rounded border px-3" onClick={()=>change(defaults,"a")}>{es?"Reiniciar":"Reset"}</button></div>
-      {demo.error&&<p role="alert" className="mt-3 text-danger">{es?"No se pudo ejecutar el flujo.":"The workflow could not run."}</p>}
-    </section><section className="min-w-0">{run?<TracePlayer collapsible locale={locale} trace={run.trace} executionMs={run.executionMs} translate={key=>traceCopy(locale,key)} renderStage={frame=><><MesaScene frame={frame} input={run.input} result={run.result} locale={locale}/>{frame.complete&&<MissionComparison locale={locale} sides={[{label:es?`Tu límite: ${run.input.maxSteps} pasos`:`Selected: ${run.input.maxSteps} steps`,value:label(run.result.comparison.selected),detail:detail(run.result.comparison.selected)},{label:es?"Referencia: 12 pasos":"Reference: 12 steps",value:label(run.result.comparison.reference),detail:detail(run.result.comparison.reference)}]} explanation={es?"Solo cambia el máximo de pasos; tokens y revisiones pueden detener ambas opciones. El motor revisa el presupuesto antes de cada paso: un paso puede superar el límite de tokens antes de la siguiente comprobación. Las unidades y latencias son simuladas, no facturación ni rendimiento reales.":"Only the step cap changes; tokens and review limits can stop both choices. The engine checks budget before each step: a step can exceed the token cap before the next check. Units and latency are simulated, not actual billing or performance."} prediction={prediction} actual={outcome(run.result)} actualLabel={label(run.result)}/>}</>}/>:<p className="rounded-xl border border-border p-5 text-sm text-muted-foreground">{es?"Elige un presupuesto para inspeccionar las transferencias.":"Choose a budget to inspect the handoffs."}</p>}</section></div>
-    <DecisionNotes locale={locale} implementation={es?"Grafo local de planificación, investigación, redacción y revisión con límites explícitos.":"Local planning, research, writing and review graph with explicit limits."} rationale={es?"Mostrar trabajo y causa de terminación permite comparar límites. Un borrador no significa aprobación y más pasos no garantizan completar.":"Work and termination reasons make caps comparable. A draft is not approval, and more steps do not guarantee completion."} production={es?"Reservar recursos antes de llamadas reales, medir uso real, controlar herramientas, persistir trazas y revisar calidad humana.":"Reserve resources before real calls, meter actual usage, constrain tools, persist traces and review quality with people."}/>
-  </div></main>;
+  const locale = useLocale();
+  const t = STORY[locale];
+  const [steps, setSteps] = useState(DEFAULT_STEPS);
+  const [prediction, setPrediction] = useState<string | null>(null);
+  const demo = useDemoRun(runMission);
+  const run = demo.run;
+  const result = run?.result;
+  // Section 03 waits for the relay to finish; keyed to the trace so every new run resets it.
+  const [playedTrace, setPlayedTrace] = useState<typeof demo.trace | null>(null);
+  const played = demo.trace.length === 0 || playedTrace === demo.trace;
+  const clear = () => { setPrediction(null); demo.reset(); };
+  const reset = () => { setSteps(DEFAULT_STEPS); clear(); };
+  const task = locale === "es" ? "Evaluar controles de riesgo de identidad" : "Assess identity risk controls";
+  const scene = (frame: typeof COMPLETE_FRAME) => result ? <MesaStoryScene frame={frame} result={result} locale={locale} /> : null;
+
+  return <main className="mx-auto max-w-5xl px-5 py-8 text-foreground sm:py-12">
+    <StoryHero name={t.name} oneLiner={t.oneLiner} chips={t.chips} />
+
+    <StorySection index={1} heading={t.analogy.heading}>
+      <AnalogyBlock paragraphs={t.analogy.paragraphs} dictionaryLabel={t.analogy.dictionaryLabel} dictionary={t.analogy.dictionary} />
+    </StorySection>
+
+    <WhyIBuiltIt title={t.why.title} text={t.why.text} />
+
+    <StorySection index={2} heading={t.tryIt.heading} lead={t.tryIt.lead}>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,.8fr)_minmax(0,1.2fr)]">
+        <section className="min-w-0 rounded-xl border border-border bg-surface p-5">
+          <MissionPrompt locale={locale} question={t.tryIt.question(steps)} prediction={prediction} onPredict={setPrediction} locked={Boolean(run) || demo.running} options={[{ id: "yes", label: t.tryIt.yes }, { id: "no", label: t.tryIt.no }]} />
+          <label className="mt-5 block text-sm">{t.tryIt.stepsLabel} <span className="font-mono">{steps}</span>
+            <input aria-label={t.tryIt.stepsLabel} className="mt-2 w-full" type="range" min="1" max="12" step="1" value={steps} onChange={e => { setSteps(Number(e.target.value)); clear(); }} />
+          </label>
+          <p className="mt-4 text-xs leading-5 text-muted-foreground">{t.tryIt.note}</p>
+          <div className="mt-6 flex flex-wrap gap-2">
+            <button type="button" data-run-experiment disabled={demo.running} className="min-w-0 flex-1 rounded-lg bg-accent px-4 py-3 text-sm font-medium text-white disabled:opacity-60" onClick={() => demo.execute({ task, maxSteps: steps, maxTokens: MAX_TOKENS, maxRejections: 1 })}>{t.tryIt.simulate}</button>
+            <button type="button" className="rounded-lg border border-border px-3 py-3 text-sm" onClick={demo.cancel}>{t.tryIt.cancel}</button>
+            <button type="button" className="rounded-lg border border-border px-3 py-3 text-sm" onClick={reset}>{t.tryIt.reset}</button>
+          </div>
+          {demo.error ? <p role="alert" className="mt-3 text-sm text-danger">{t.tryIt.error}</p> : null}
+        </section>
+        <section className="min-w-0">
+          {run && result
+            ? (demo.trace.length === 0 ? scene(COMPLETE_FRAME) : <TracePlayer collapsible autoPlay headingLevel="h3" onComplete={() => setPlayedTrace(demo.trace)} translate={key => traceCopy(locale, key)} trace={demo.trace} locale={locale} executionMs={run.executionMs} renderStage={scene} />)
+            : <p className="rounded-xl border border-dashed border-border p-8 text-sm text-muted-foreground">{t.tryIt.idle}</p>}
+        </section>
+      </div>
+    </StorySection>
+
+    <StorySection index={3} heading={t.compare.heading} lead={t.compare.lead}>
+      {run && result && played ? <MissionComparison locale={locale} prediction={prediction} actual={delivered(result) ? "yes" : "no"} actualLabel={t.scene.legsOf(finished(result))} explanation={t.compare.sentence(finished(result.comparison.selected), finished(result.comparison.reference))} sides={[
+        { label: t.compare.mine(run.input.maxSteps), value: `${finished(result.comparison.selected)}`, detail: t.compare.finished },
+        { label: t.compare.reference, value: `${finished(result.comparison.reference)}`, detail: t.compare.finished, positive: finished(result.comparison.reference) > finished(result.comparison.selected) },
+      ]} /> : null}
+    </StorySection>
+
+    <StorySection index={4} heading={t.fit.heading}>
+      <FitGuide worthLabel={t.fit.worthLabel} worth={t.fit.worth} notLabel={t.fit.notLabel} not={t.fit.not} />
+    </StorySection>
+
+    <StorySection index={5} heading={t.proves.heading}>
+      <ProvesBlock text={t.proves.text} />
+    </StorySection>
+
+    <EngineerNotes summary={t.engineers.summary}>
+      <ul className="list-disc space-y-2 pl-5">{t.engineers.points.map(p => <li key={p}>{p}</li>)}</ul>
+      <a className="mt-4 inline-block text-accent underline underline-offset-4" href={REPO}>{t.engineers.repoLabel} →</a>
+    </EngineerNotes>
+  </main>;
 }
