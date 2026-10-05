@@ -1,117 +1,95 @@
-# Mesa
+# Bounded agent workflow
 
-**Multi-agent orchestration with typed handoffs, code-enforced budgets and a
-terminating reviewer subgraph.** A supervisor delegates to three specialists
-(planner / researcher / writer) through validated schemas; every step is
-traced, and the graph is guaranteed to finish — measured, not assumed.
+[Español](README.es.md) · [Try the demo](https://mesa-manueldeasis27-2515s-projects.vercel.app/en/app) · [Case study](https://manueldeasis.com/en/projects/mesa) · [Source](https://github.com/mdeasis27/mesa)
 
-> **Result:** Across **36 runs** (3 tasks × 4 rejection caps × 3 budget limits)
-> with an **adversarial reviewer that always demands a revision**, **36/36 runs
-> terminate** and **36/36 stay within budget**. The step count never exceeds the
-> hard bound `4 + 2·maxRejections`.
+![Actual interactive local interface](docs/images/cover.png)
 
----
+Change a task, execution budget and rejection cap to inspect handoffs and termination.
 
-## Result
+## Two situations to compare
 
-### Termination + budget sweep (n = 36)
+**Enough budget:** Assess identity risk controls: 12 steps, 10,000 tokens, one review allowance. Agents complete their configured handoffs within budget.
 
-| Guarantee | Result |
-|---|---|
-| Runs that terminate | **36/36 (100%)** |
-| Runs that stay within budget | **36/36 (100%)** |
-| Step bound respected | **36/36 (100%)** |
+![Enough budget](docs/images/scenario-a.png)
 
-The worst-case reviewer — one that returns `reject_and_revise` on every pass —
-is exactly the case that would loop forever in a naive agent. Here the rejection
-counter is strictly increasing and capped, so even the pathological input
-converges. The sweep varies the cap (`maxRejections` 0–5) and the budget
-(`maxSteps` 3, 8, 50) to confirm the bound holds across configurations, not just
-for one happy path.
+**Minimal budget:** Same task with one step and 100 tokens. The graph stops at its configured boundary.
 
-### Budget, enforced in code (not in the prompt)
+![Minimal budget](docs/images/scenario-b.png)
 
-Every step checks four limits before executing: sub-queries, tokens, steps and
-wall-clock. Crossing any limit halts the graph deterministically with a
-`BudgetExhaustedError` — no unhandled exceptions, no token burn, no "please stop"
-in a system prompt.
+## Business use case
 
-| Limit | Default |
-|---|---|
-| max sub-queries | 6 |
-| max tokens | 10,000 |
-| max steps | 12 |
-| max wall-clock | 120,000 ms |
+A multi-agent report can exceed its allowed work budget before reaching a usable conclusion.
 
-### Step trace (durable state)
+**Who uses it:** Automation workflow owner.
 
-Each step records what agent received what, what it produced, tokens and
-latency. `traceSnapshot()` serializes the run so it can be resumed after a crash
-— the trace is the source of truth, not a log line.
+**The decision:** Grant more agent budget or stop the workflow boundary.
 
----
+Choose enough or minimal budget, trace agent handoffs, and inspect where the graph completes or stops.
+
+### Try the decision
+
+**Enough budget:** Assess identity risk controls: 12 steps, 10,000 tokens, one review allowance. Agents complete their configured handoffs within budget.
+
+**Minimal budget:** Same task with one step and 100 tokens. The graph stops at its configured boundary.
+
+Choose a scenario, edit its controls and run the local computation. Step through the visual process or reveal all steps. Reset before comparing the second scenario.
+
+## How to try it
+
+Open `/en/app` (English, default) or `/es/app` (Spanish). Change the scenario inputs and run the computation. Inspect the resulting decision, evidence and computed trace. Playback reveals completed local steps; it does not measure a live model. Reset starts a new local scenario. Changing language resets the scenario.
+
+The primary demo needs no account, API key or database. Public links refer to the existing deployment; local redesign changes are pending publication.
+
+<!-- recruiter-mission:start -->
+### Your interactive mission
+
+Load the one-step challenge with 10,000 modeled token units and one revision allowance. Optionally predict approval, budget stop or review, then reveal the handoffs.
+
+Compare the selected step cap with 12 steps on the same task, token cap and revision allowance. Both may stop when another limit binds. Show consumed steps, modeled token units, draft availability and termination; a draft is not approval.
+
+**Why this approach:** A bounded local agent graph explains handoffs without live models. Budgets are checked before each step, so a step can exceed the token cap before the next check. These units and latencies are simulation assumptions, not usage billing.
+
+**Before production:** Reserve resources before real calls, meter actual usage, constrain tools, persist traces and evaluate output quality with reviewers.
+
+Editing inputs, choosing a preset or resetting clears the prediction and obsolete results. Comparisons appear only at completed playback; the primary demos need no account or key.
+
+This batch changes the implementation. Existing screenshots and browser reports document the previous stage. Fresh captures, browser interaction, mobile and HTTP verification remain pending under the documented tool denials. Prior owner visual approval covers the earlier six-mission pilot, not this batch.
+<!-- recruiter-mission:end -->
+
+## Local setup and verification
+
+Requires Node.js 22 and pnpm 10.
+
+```sh
+pnpm install --frozen-lockfile
+pnpm dev
+pnpm test
+node node_modules/typescript/bin/tsc --noEmit --incremental false
+pnpm lint
+pnpm build
+```
+
+Open `http://localhost:3000/en/app`. Recorded validation covers tests, lint, TypeScript and production builds. See [command results](docs/quality/decision-lab-verification.json) and [browser component checks](docs/quality/decision-lab-browser.json). The new browser checks exercise real React components and production CSS with controlled locale navigation; they do not certify Next routes or public deployment.
 
 ## Architecture
 
-```
-lib/mesa/             # core orchestrator (TypeScript, tested)
-  graph.ts            #   runs the typed-handoff DAG, enforces budget, traces
-  schemas.ts          #   structural handoff contracts (validated at runtime)
-  budget.ts           #   subquery/token/step/wall-clock limits + exhaustion
-  reviewer.ts         #   rejection counter that guarantees termination
-  trace.ts            #   step recording + per-agent aggregation + snapshot
-  rng.ts              #   deterministic seeded PRNG (no Math.random in core)
-  demo-agents.ts      #   deterministic offline agents over committed knowledge
-  demo.ts             #   wires the demo tasks → run → summary
-  eval.ts             #   termination + budget sweep (the headline number)
-  data/knowledge.json #   committed local facts (demo corpus)
-backend/              # same math in Python + pytest (authoritative)
-  src/mesa/
-  tests/              #   pinned to tests/fixtures/orchestration.json
-app/                  # Next.js landing + demo dashboard (Vercel, demo mode)
-```
+- `app/[lang]/`: localized browser experience.
+- `lib/experience/`: typed local adapter, validation and run traces.
+- `design-system/`: shared visual tokens, locale controls and execution/replay presentation.
+- `app/api/`: optional server integrations; the primary demo does not require them.
 
-The graph is a fixed DAG: `supervisor → planner → researcher → writer ⇄ reviewer`.
-Handlers are injected, so the same graph runs with the deterministic demo agents
-or, in live mode, with LLM-backed handlers behind the identical interface.
+Technology: Next.js 16, TypeScript, Python, Vitest, pytest, Tailwind CSS v4.
 
-## Design decisions & tradeoffs
+## Evidence and limitations
 
-1. **The budget lives in code, not the prompt.** Prompted budget limits are
-   advisory; a model can (and does) ignore them. Checking the limit *before*
-   each step makes exhaustion a deterministic outcome. The cost is that handlers
-   must report their token/latency honestly — a contract the interface enforces.
-2. **Termination is a counter, not a hope.** The reviewer subgraph is the one
-   place an agent loop can spin forever. Capping `reject_and_revise` with a
-   strictly-increasing counter is a structural guarantee — provable by the sweep
-   above — rather than a behavioural one.
-3. **Handoffs are schemas, not personas.** Agents pass typed payloads
-   (`{ queries, context }`, `{ findings, citations, topic }`) validated at
-   runtime. This is what makes the orchestration debuggable: a broken handoff
-   fails loudly at the edge, not silently downstream.
+Agent nodes appear one handoff at a time in the actual local execution sequence; the budget and termination reason stay inspectable.
 
-## What did not work
+Deterministic agent proxies, budget consumption and bounded review loops.
 
-- **A supervisor that "re-plans" mid-run was cut.** Looping the supervisor back
-  into planning reintroduces a cycle whose termination you can only argue for,
-  not guarantee. The fixed DAG loses some adaptivity but keeps the termination
-  argument watertight — a deliberate trade against "flexibility" narrative.
-- **Token accounting is an estimate in demo mode.** The deterministic agents
-  report a character-based token estimate (`len/4`), not a real tokenizer. The
-  budget *mechanism* is real; the absolute numbers are meant to be replaced by
-  real tokenizer counts in live mode (same interface).
+Makes the relationship between handoffs and a bounded report visible.
 
-## Run it
+**Limits:** Agent handoffs and budget units are local workflow models, not live usage accounting. These portfolio prototypes do not claim measured production impact.
 
-```bash
-# frontend demo + TS tests
-pnpm install && pnpm dev      # http://localhost:3000
-pnpm test                     # 39 vitest tests
+Inputs use fictional or anonymized examples. Optional live integrations require their own credentials and operational setup. Secrets belong in the configured secret manager, never in local secret files or Git. Use the existing `infisical run -- <command>` workflow when live integration is needed. This repository does not publish or deploy automatically as part of the local demo.
 
-# backend (authoritative math) — Python 3.12+
-cd backend && uv sync --extra dev && uv run pytest   # 5 tests, pinned fixture
-```
-
-## Stack
-
-Next.js 16 · TypeScript · Vitest · Tailwind v4 · Python 3.13 · pytest
+![Actual English demo capture](docs/images/demo.png)

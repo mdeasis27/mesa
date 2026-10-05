@@ -49,3 +49,8 @@ __pycache__/
 *.egg-info/
 
 .vercel
+
+# Generated component diagnostics; accepted captures use canonical filenames.
+/docs/images/lab.*.png
+
+/docs/quality/*.log

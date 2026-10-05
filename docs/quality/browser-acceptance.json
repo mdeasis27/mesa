@@ -1,0 +1,46 @@
+{
+  "repository": "mesa",
+  "checks": [
+    {
+      "locale": "en",
+      "htmlLang": "en",
+      "buttons": [
+        "Run local workflow",
+        "Cancel",
+        "Reset"
+      ],
+      "inputs": 4,
+      "clicked": "Run local workflow",
+      "traceEvents": 4,
+      "keyboardFocus": "SELECT",
+      "editingInvalidatesEvidence": true,
+      "resetClearsResult": true,
+      "cancelUsable": true,
+      "languageSwitchWithoutStorage": true
+    },
+    {
+      "locale": "es",
+      "htmlLang": "es",
+      "buttons": [
+        "Ejecutar flujo local",
+        "Cancelar",
+        "Reiniciar"
+      ],
+      "inputs": 4,
+      "clicked": "Ejecutar flujo local",
+      "traceEvents": 4,
+      "keyboardFocus": "SELECT",
+      "editingInvalidatesEvidence": true,
+      "resetClearsResult": true,
+      "cancelUsable": true,
+      "languageSwitchWithoutStorage": true
+    }
+  ],
+  "errors": [],
+  "legacyRedirectRetainsQuery": true,
+  "unsupportedLocale404": true,
+  "translatedBodyDiffers": true,
+  "reducedMotionDisablesPlayback": true,
+  "mobileNoOverflow": true,
+  "noExternalOrApiRequests": true
+}

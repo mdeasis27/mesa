@@ -1,0 +1,1 @@
+export function traceCopy(locale:"en"|"es",key:string){const es=locale==="es";return ({planner:es?"planificador":"planner",researcher:es?"investigador":"researcher",writer:es?"redactor":"writer",reviewer:es?"revisor":"reviewer"}[key]??key);}
