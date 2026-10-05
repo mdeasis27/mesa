@@ -1,0 +1,51 @@
+{
+  "repository": "mesa",
+  "scope": "Real React component with controlled locale; Next routes not tested.",
+  "checks": [
+    {
+      "locale": "en",
+      "scenarios": [
+        {
+          "preset": "Enough budget\nAssess identity risk controls: 12 steps, 10,000 tokens, one review allowance.",
+          "outcome": "Termination: approved\n\nSimulated proxy latency is 2100 ms; playback does not measure a live model."
+        },
+        {
+          "preset": "Minimal budget\nSame task with one step and 100 tokens.",
+          "outcome": "Termination: budget exhausted: steps\n\nSimulated proxy latency is 284 ms; playback does not measure a live model."
+        }
+      ],
+      "mobileNoOverflow": true,
+      "reducedMotion": true,
+      "keyboard": true,
+      "noRequests": true,
+      "sceneChangesWithScenario": true,
+      "editingClearsPresetAndTrace": true,
+      "resetRestoresFirstPreset": true,
+      "cancelControlPresent": true,
+      "presetRestoresAllInputs": true
+    },
+    {
+      "locale": "es",
+      "scenarios": [
+        {
+          "preset": "Presupuesto suficiente\nEvaluar controles de riesgo de identidad: 12 pasos, 10 000 tokens, una revisión permitida.",
+          "outcome": "Terminación: aprobado\n\nLa latencia de proxy simulada es 2100 ms; la reproducción no mide un modelo en vivo."
+        },
+        {
+          "preset": "Presupuesto mínimo\nMisma tarea con un paso y 100 tokens.",
+          "outcome": "Terminación: límite de pasos alcanzado\n\nLa latencia de proxy simulada es 284 ms; la reproducción no mide un modelo en vivo."
+        }
+      ],
+      "mobileNoOverflow": true,
+      "reducedMotion": true,
+      "keyboard": true,
+      "noRequests": true,
+      "sceneChangesWithScenario": true,
+      "editingClearsPresetAndTrace": true,
+      "resetRestoresFirstPreset": true,
+      "cancelControlPresent": true,
+      "presetRestoresAllInputs": true
+    }
+  ],
+  "errors": []
+}

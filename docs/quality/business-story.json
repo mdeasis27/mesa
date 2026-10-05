@@ -1,0 +1,40 @@
+{
+  "en": {
+    "user": "Automation workflow owner",
+    "problem": "A multi-agent report can exceed its allowed work budget before reaching a usable conclusion.",
+    "workflow": "Choose enough or minimal budget, trace agent handoffs, and inspect where the graph completes or stops.",
+    "decision": "Grant more agent budget or stop the workflow boundary.",
+    "value": "Makes the relationship between handoffs and a bounded report visible.",
+    "visual": "Agent nodes appear one handoff at a time in the actual local execution sequence; the budget and termination reason stay inspectable.",
+    "scenarioA": {
+      "title": "Enough budget",
+      "input": "Assess identity risk controls: 12 steps, 10,000 tokens, one review allowance.",
+      "observation": "Agents complete their configured handoffs within budget."
+    },
+    "scenarioB": {
+      "title": "Minimal budget",
+      "input": "Same task with one step and 100 tokens.",
+      "observation": "The graph stops at its configured boundary."
+    },
+    "limitation": "Agent handoffs and budget units are local workflow models, not live usage accounting."
+  },
+  "es": {
+    "user": "Responsable de flujos de automatización",
+    "problem": "Un informe multiagente puede exceder su presupuesto de trabajo antes de llegar a una conclusión útil.",
+    "workflow": "Elige presupuesto suficiente o mínimo, sigue handoffs de agentes e inspecciona dónde el grafo completa o se detiene.",
+    "decision": "Ajustar el presupuesto del proceso o detenerlo al alcanzar su límite.",
+    "value": "Hace visible la relación entre handoffs y un informe acotado.",
+    "visual": "Los nodos de agentes aparecen con cada transferencia de la secuencia local real; el presupuesto y la causa de terminación permanecen inspeccionables.",
+    "scenarioA": {
+      "title": "Presupuesto suficiente",
+      "input": "Evaluar controles de riesgo de identidad: 12 pasos, 10 000 tokens, una revisión permitida.",
+      "observation": "Los agentes completan sus handoffs configurados dentro del presupuesto."
+    },
+    "scenarioB": {
+      "title": "Presupuesto mínimo",
+      "input": "Misma tarea con un paso y 100 tokens.",
+      "observation": "El grafo se detiene en su límite configurado."
+    },
+    "limitation": "Los handoffs y unidades de presupuesto son modelos locales de flujo, no contabilidad de uso real."
+  }
+}
