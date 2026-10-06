@@ -1,7 +1,7 @@
 import type { Heading } from "@/design-system/demo/project-story";
 import type { RelayAgent } from "./relay-state";
 
-type NodeCopy = { name: string; sub: string; analogy: string };
+type NodeCopy = { name: string };
 
 export interface MesaStory {
   name: string;
@@ -14,7 +14,7 @@ export interface MesaStory {
   fit: { heading: Heading; worthLabel: string; worth: string; notLabel: string; not: string };
   proves: { heading: Heading; text: string };
   engineers: { summary: string; points: string[]; repoLabel: string };
-  scene: { title: string; caption: string; statusLabels: { success: string; danger: string; off: string }; nodes: Record<RelayAgent, NodeCopy>; legsOf: (n: number) => string };
+  scene: { title: string; caption: string; statusLabels: { success: string; danger: string; off: string; idle: string }; nodes: Record<RelayAgent, NodeCopy>; legsOf: (n: number) => string; budgetOf: (n: number) => string; stepsLeft: (n: number) => string; timeUp: string; finish: string; delivered: string; dropped: string; trackLabel: (finished: number, left: number) => string };
 }
 
 export const STORY: Record<"en" | "es", MesaStory> = {
@@ -44,7 +44,7 @@ export const STORY: Record<"en" | "es", MesaStory> = {
       yes: "Yes, it's delivered",
       no: "No, it stops",
       stepsLabel: "Steps the agents may spend",
-      note: "Each box is one agent. Green finished its leg, red is where the budget ran out, and grey never got the baton.",
+      note: "Each runner is one agent. Green finished its leg, red with an × is where the clock ran out, and grey never got the baton. The clock loses one wedge for every step spent.",
       simulate: "Run it",
       cancel: "Cancel",
       reset: "Start over",
@@ -87,14 +87,21 @@ export const STORY: Record<"en" | "es", MesaStory> = {
     scene: {
       title: "How far the baton got",
       caption: "Watch each agent hand the work to the next, and see where the budget stops the race.",
-      statusLabels: { success: "finished", danger: "stopped: budget ran out", off: "never got the baton" },
+      statusLabels: { success: "finished", danger: "stopped: time ran out", off: "never got the baton", idle: "waiting" },
       nodes: {
-        planner: { name: "Plan", sub: "first leg", analogy: "runner 1" },
-        researcher: { name: "Research", sub: "second leg", analogy: "runner 2" },
-        writer: { name: "Write", sub: "third leg", analogy: "runner 3" },
-        reviewer: { name: "Review", sub: "last leg", analogy: "the finish line" },
+        planner: { name: "Plan" },
+        researcher: { name: "Research" },
+        writer: { name: "Write" },
+        reviewer: { name: "Review" },
       },
       legsOf: (n) => `${n} of 4 agents finished`,
+      budgetOf: (n) => `Budget: ${n} ${n === 1 ? "step" : "steps"}`,
+      stepsLeft: (n) => `${n} ${n === 1 ? "step" : "steps"} left on the clock`,
+      timeUp: "Time ran out",
+      finish: "finish",
+      delivered: "The baton crossed the finish line: the report was approved.",
+      dropped: "The baton fell before the finish line: no report was delivered.",
+      trackLabel: (finished, left) => `Relay track: ${finished} of 4 agents finished their leg, ${left} ${left === 1 ? "step" : "steps"} left on the clock.`,
     },
   },
   es: {
@@ -123,7 +130,7 @@ export const STORY: Record<"en" | "es", MesaStory> = {
       yes: "Sí, se entrega",
       no: "No, se detiene",
       stepsLabel: "Pasos que pueden gastar los agentes",
-      note: "Cada caja es un agente. Verde terminó su relevo, rojo es donde se acabó el presupuesto y gris nunca recibió la estafeta.",
+      note: "Cada corredor es un agente. Verde terminó su relevo, rojo con una × es donde se acabó el tiempo y gris nunca recibió la estafeta. El cronómetro pierde una rebanada por cada paso gastado.",
       simulate: "Correr",
       cancel: "Cancelar",
       reset: "Empezar de nuevo",
@@ -166,14 +173,21 @@ export const STORY: Record<"en" | "es", MesaStory> = {
     scene: {
       title: "Hasta dónde llegó la estafeta",
       caption: "Mira cómo cada agente le pasa el trabajo al siguiente, y dónde el presupuesto detiene la carrera.",
-      statusLabels: { success: "terminó", danger: "detenido: se acabó el presupuesto", off: "nunca recibió la estafeta" },
+      statusLabels: { success: "terminó", danger: "detenido: se acabó el tiempo", off: "nunca recibió la estafeta", idle: "esperando" },
       nodes: {
-        planner: { name: "Planea", sub: "primer relevo", analogy: "corredor 1" },
-        researcher: { name: "Investiga", sub: "segundo relevo", analogy: "corredor 2" },
-        writer: { name: "Redacta", sub: "tercer relevo", analogy: "corredor 3" },
-        reviewer: { name: "Revisa", sub: "último relevo", analogy: "la meta" },
+        planner: { name: "Planea" },
+        researcher: { name: "Investiga" },
+        writer: { name: "Redacta" },
+        reviewer: { name: "Revisa" },
       },
       legsOf: (n) => `${n} de 4 agentes terminaron`,
+      budgetOf: (n) => `Presupuesto: ${n} ${n === 1 ? "paso" : "pasos"}`,
+      stepsLeft: (n) => n === 1 ? "Queda 1 paso en el cronómetro" : `Quedan ${n} pasos en el cronómetro`,
+      timeUp: "Se acabó el tiempo",
+      finish: "meta",
+      delivered: "La estafeta cruzó la meta: el informe quedó aprobado.",
+      dropped: "La estafeta cayó antes de la meta: no se entregó el informe.",
+      trackLabel: (finished, left) => `Pista de relevos: ${finished} de 4 agentes terminaron su tramo, ${left === 1 ? "queda 1 paso" : `quedan ${left} pasos`} en el cronómetro.`,
     },
   },
 };

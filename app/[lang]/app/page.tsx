@@ -32,7 +32,7 @@ export default function Page() {
   const clear = () => { setPrediction(null); demo.reset(); };
   const reset = () => { setSteps(DEFAULT_STEPS); clear(); };
   const task = locale === "es" ? "Evaluar controles de riesgo de identidad" : "Assess identity risk controls";
-  const scene = (frame: typeof COMPLETE_FRAME) => result ? <MesaStoryScene frame={frame} result={result} locale={locale} /> : null;
+  const scene = (frame: typeof COMPLETE_FRAME) => result && run ? <MesaStoryScene key={result.trace.runId} frame={frame} result={result} maxSteps={run.input.maxSteps} locale={locale} /> : null;
 
   return <main className="mx-auto max-w-5xl px-5 py-8 text-foreground sm:py-12">
     <StoryHero name={t.name} oneLiner={t.oneLiner} chips={t.chips} />
